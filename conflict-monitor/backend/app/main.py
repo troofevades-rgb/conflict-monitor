@@ -10,7 +10,11 @@ from app.config import settings
 from app.db import engine
 from app.models import Base
 from app.routes.events import router as events_router
+from app.routes.tracking import router as tracking_router
 from app.routes.ws import router as ws_router
+from app.services.maritime import start_maritime_poller
+from app.services.opensky import start_opensky_poller
+from app.services.satellites import start_tle_fetcher
 from app.services.telegram import start_telegram_listener
 
 logger = logging.getLogger("conflict-monitor")
@@ -25,18 +29,31 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables ready")
 
+    tasks: list[asyncio.Task] = []
+
     # Start Telegram listener in background
-    telegram_task = None
     if settings.telegram_api_id and settings.telegram_api_hash:
-        telegram_task = asyncio.create_task(start_telegram_listener())
+        tasks.append(asyncio.create_task(start_telegram_listener()))
         logger.info("Telegram listener started")
     else:
         logger.warning("Telegram credentials not set — listener disabled")
 
+    # Start OpenSky aircraft poller
+    tasks.append(asyncio.create_task(start_opensky_poller()))
+    logger.info("OpenSky poller started")
+
+    # Start CelesTrak TLE fetcher
+    tasks.append(asyncio.create_task(start_tle_fetcher()))
+    logger.info("CelesTrak TLE fetcher started")
+
+    # Start AISStream maritime vessel tracker
+    tasks.append(asyncio.create_task(start_maritime_poller()))
+    logger.info("AISStream maritime poller started")
+
     yield
 
-    if telegram_task:
-        telegram_task.cancel()
+    for task in tasks:
+        task.cancel()
 
 
 app = FastAPI(title="Conflict Monitor", lifespan=lifespan)
@@ -50,6 +67,7 @@ app.add_middleware(
 )
 
 app.include_router(events_router)
+app.include_router(tracking_router)
 app.include_router(ws_router)
 
 

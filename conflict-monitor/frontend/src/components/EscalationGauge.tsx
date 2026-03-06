@@ -22,6 +22,13 @@ function gaugeColor(level: number): string {
   return lerp("#f85149", "#da3633", (level - 6) / 4);
 }
 
+function statusLabel(level: number): { text: string; color: string } {
+  if (level <= 3) return { text: "LOW ACTIVITY", color: "var(--severity-low)" };
+  if (level <= 6) return { text: "ELEVATED", color: "var(--severity-mid)" };
+  if (level <= 8) return { text: "HIGH ALERT", color: "var(--severity-high)" };
+  return { text: "CRITICAL", color: "#ff2020" };
+}
+
 interface EscalationGaugeProps {
   events: ConflictEvent[];
 }
@@ -36,10 +43,16 @@ export function EscalationGauge({ events }: EscalationGaugeProps) {
 
   const pct = Math.min(level / 10, 1);
   const color = gaugeColor(level);
+  const status = statusLabel(level);
+
+  // Glow intensity scales with level (0 to 1)
+  const glowIntensity = Math.min(level / 10, 1);
+  const glowAlpha = (0.1 + glowIntensity * 0.4).toFixed(2);
+  const glowSpread = Math.round(4 + glowIntensity * 12);
 
   // Arc gauge using SVG
   const radius = 70;
-  const stroke = 14;
+  const stroke = 12;
   const circumference = Math.PI * radius; // semicircle
   const offset = circumference * (1 - pct);
 
@@ -53,6 +66,8 @@ export function EscalationGauge({ events }: EscalationGaugeProps) {
         alignItems: "center",
         justifyContent: "center",
         padding: 16,
+        boxShadow: `0 0 ${glowSpread}px rgba(${level > 6 ? "248,81,73" : level > 3 ? "210,153,34" : "63,185,80"},${glowAlpha}), 0 0 1px var(--border-glow)`,
+        transition: "box-shadow 1s ease",
       }}
     >
       <svg width="180" height="100" viewBox="0 0 180 100">
@@ -73,40 +88,65 @@ export function EscalationGauge({ events }: EscalationGaugeProps) {
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          style={{ transition: "stroke-dashoffset 0.8s ease, stroke 0.8s ease" }}
+          style={{
+            transition: "stroke-dashoffset 0.8s ease, stroke 0.8s ease",
+            filter: `drop-shadow(0 0 ${3 + glowIntensity * 6}px ${color})`,
+          }}
         />
         {/* Level number */}
         <text
           x="90"
-          y="80"
+          y="78"
           textAnchor="middle"
           fill={color}
-          fontSize="32"
+          fontSize="30"
           fontWeight="700"
-          fontFamily="monospace"
+          fontFamily="var(--font-mono)"
+          style={{ transition: "fill 0.8s ease" }}
         >
           {level.toFixed(1)}
         </text>
       </svg>
+
+      {/* Status text */}
       <div
         style={{
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: 700,
+          letterSpacing: 3,
+          color: status.color,
+          marginTop: 2,
+          fontFamily: "var(--font-mono)",
+          transition: "color 0.8s ease",
+          animation: level >= 7 ? "pulse 2s ease-in-out infinite" : undefined,
+        }}
+      >
+        {status.text}
+      </div>
+
+      <div
+        style={{
+          fontSize: 9,
           letterSpacing: 2,
           color: "var(--text-secondary)",
-          marginTop: 4,
+          marginTop: 6,
+          fontFamily: "var(--font-sans)",
+          fontWeight: 500,
+          textTransform: "uppercase",
         }}
       >
         ESCALATION LEVEL
       </div>
       <div
         style={{
-          fontSize: 10,
+          fontSize: 9,
           color: "var(--text-secondary)",
           marginTop: 2,
+          fontFamily: "var(--font-mono)",
+          opacity: 0.6,
         }}
       >
-        rolling avg of last {WINDOW} events
+        rolling avg / last {WINDOW}
       </div>
     </div>
   );

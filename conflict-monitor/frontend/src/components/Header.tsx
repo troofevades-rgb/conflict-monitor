@@ -1,9 +1,42 @@
+import { useEffect, useState } from "react";
+
 interface HeaderProps {
   isConnected: boolean;
   eventCount: number;
+  aircraftCount: number;
+  vesselCount: number;
+  satelliteCount: number;
 }
 
-export function Header({ isConnected, eventCount }: HeaderProps) {
+function formatUTCTime(): string {
+  const now = new Date();
+  const months = [
+    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+  ];
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  const month = months[now.getUTCMonth()];
+  const year = now.getUTCFullYear();
+  const hours = String(now.getUTCHours()).padStart(2, "0");
+  const minutes = String(now.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(now.getUTCSeconds()).padStart(2, "0");
+  return `${day} ${month} ${year} | ${hours}:${minutes}:${seconds} UTC`;
+}
+
+export function Header({
+  isConnected,
+  eventCount,
+  aircraftCount,
+  vesselCount,
+  satelliteCount,
+}: HeaderProps) {
+  const [utcTime, setUtcTime] = useState(formatUTCTime);
+
+  useEffect(() => {
+    const interval = setInterval(() => setUtcTime(formatUTCTime()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <header
       className="panel"
@@ -16,31 +49,88 @@ export function Header({ isConnected, eventCount }: HeaderProps) {
         borderBottom: "1px solid var(--border)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: 1 }}>
+      {/* Left: Title + Subtitle */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+        <h1
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            letterSpacing: 4,
+            fontFamily: "var(--font-sans)",
+            color: "var(--text-primary)",
+          }}
+        >
           CONFLICT MONITOR
         </h1>
         <span
-          style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 2 }}
+          style={{
+            fontSize: 10,
+            letterSpacing: 2,
+            color: "var(--text-secondary)",
+            fontWeight: 500,
+          }}
         >
-          Israel / US & Iran Theatre
+          REAL-TIME OSINT INTELLIGENCE
         </span>
       </div>
+
+      {/* Center: UTC Clock */}
+      <div
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 13,
+          fontWeight: 500,
+          color: "var(--accent-blue)",
+          letterSpacing: 1,
+          opacity: 0.9,
+        }}
+      >
+        {utcTime}
+      </div>
+
+      {/* Right: Counts + Status */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-          {eventCount} events tracked
-        </span>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            color: "var(--text-secondary)",
+            letterSpacing: 1,
+          }}
+        >
+          <span>{eventCount} EVT</span>
+          <span style={{ opacity: 0.4 }}>|</span>
+          <span>{aircraftCount} AC</span>
+          <span style={{ opacity: 0.4 }}>|</span>
+          <span>{vesselCount} VES</span>
+          <span style={{ opacity: 0.4 }}>|</span>
+          <span>{satelliteCount} SAT</span>
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div
             style={{
-              width: 8,
-              height: 8,
+              width: 7,
+              height: 7,
               borderRadius: "50%",
-              background: isConnected ? "var(--accent-green)" : "var(--accent-red)",
+              background: isConnected
+                ? "var(--accent-green)"
+                : "var(--accent-red)",
+              animation: isConnected
+                ? "statusPulse 2s ease-in-out infinite"
+                : undefined,
             }}
           />
-          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            {isConnected ? "LIVE" : "DISCONNECTED"}
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: 1,
+              color: isConnected ? "var(--accent-green)" : "var(--accent-red)",
+            }}
+          >
+            {isConnected ? "LIVE" : "OFFLINE"}
           </span>
         </div>
       </div>

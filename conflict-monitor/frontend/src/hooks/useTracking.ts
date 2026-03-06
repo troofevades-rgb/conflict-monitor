@@ -1,0 +1,112 @@
+import { useEffect, useRef, useState } from "react";
+
+export interface Aircraft {
+  icao24: string;
+  callsign: string;
+  origin_country: string;
+  lat: number;
+  lon: number;
+  altitude: number | null;
+  velocity: number | null;
+  heading: number | null;
+  on_ground: boolean;
+  position_source: number;
+}
+
+export interface TLERecord {
+  name: string;
+  line1: string;
+  line2: string;
+}
+
+export interface JammingZone {
+  lat: number;
+  lon: number;
+  radius_km: number;
+  aircraft_count: number;
+  intensity: number;
+}
+
+export interface Vessel {
+  mmsi: string;
+  name: string;
+  lat: number;
+  lon: number;
+  speed: number;
+  heading: number;
+  course: number;
+  nav_status: number;
+  ship_type?: number;
+  ship_type_name?: string;
+  destination?: string;
+  length?: number;
+}
+
+const API_BASE = "http://localhost:8000";
+const AIRCRAFT_POLL_MS = 15_000;
+const JAMMING_POLL_MS = 15_000;
+const VESSEL_POLL_MS = 10_000;
+const TLE_POLL_MS = 6 * 3600 * 1000;
+
+export function useTracking() {
+  const [aircraft, setAircraft] = useState<Aircraft[]>([]);
+  const [tleData, setTleData] = useState<TLERecord[]>([]);
+  const [jammingZones, setJammingZones] = useState<JammingZone[]>([]);
+  const [vessels, setVessels] = useState<Vessel[]>([]);
+  const mountedRef = useRef(true);
+
+  // Poll aircraft positions
+  useEffect(() => {
+    mountedRef.current = true;
+    const fetchAircraft = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/tracking/aircraft`);
+        if (res.ok && mountedRef.current) setAircraft(await res.json());
+      } catch { /* backend unavailable */ }
+    };
+    fetchAircraft();
+    const interval = setInterval(fetchAircraft, AIRCRAFT_POLL_MS);
+    return () => { mountedRef.current = false; clearInterval(interval); };
+  }, []);
+
+  // Poll jamming zones
+  useEffect(() => {
+    const fetchJamming = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/tracking/jamming`);
+        if (res.ok) setJammingZones(await res.json());
+      } catch { /* backend unavailable */ }
+    };
+    fetchJamming();
+    const interval = setInterval(fetchJamming, JAMMING_POLL_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Poll vessel positions
+  useEffect(() => {
+    const fetchVessels = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/tracking/vessels`);
+        if (res.ok) setVessels(await res.json());
+      } catch { /* backend unavailable */ }
+    };
+    fetchVessels();
+    const interval = setInterval(fetchVessels, VESSEL_POLL_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch TLE data
+  useEffect(() => {
+    const fetchTLE = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/tracking/tle`);
+        if (res.ok) setTleData(await res.json());
+      } catch { /* backend unavailable */ }
+    };
+    fetchTLE();
+    const interval = setInterval(fetchTLE, TLE_POLL_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  return { aircraft, tleData, jammingZones, vessels };
+}

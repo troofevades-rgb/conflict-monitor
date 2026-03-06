@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     telegram_phone: str = ""
     anthropic_api_key: str = ""
     telegram_channels: str = ""  # comma-separated channel usernames
+    opensky_username: str = ""
+    opensky_password: str = ""
+    aisstream_api_key: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
