@@ -22,6 +22,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/conflict_monitor
+      DEMO_MODE: ${DEMO_MODE:-false}
     depends_on:
       db:
         condition: service_healthy
@@ -36,6 +37,9 @@ services:
     env_file: .env
     environment:
       VITE_MAPBOX_TOKEN: ${MAPBOX_TOKEN:-}
+      VITE_GOOGLE_MAPS_KEY: ${GOOGLE_MAPS_KEY:-}
+      VITE_CESIUM_ION_TOKEN: ${CESIUM_ION_TOKEN:-}
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     depends_on:
       - backend
     volumes:

@@ -27,6 +27,9 @@ class EventRead(BaseModel):
     lon: float | None
     timestamp: datetime
     created_at: datetime
+    report_count: int = 1
+    reporting_channels: str = ""
+    source_reliability: int | None = None
 
     model_config = {"from_attributes": True}
 

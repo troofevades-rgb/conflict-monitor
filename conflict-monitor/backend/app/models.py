@@ -30,3 +30,6 @@ class Event(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    report_count: Mapped[int] = mapped_column(Integer, default=1)
+    reporting_channels: Mapped[str] = mapped_column(Text, default="")
+    source_reliability: Mapped[int | None] = mapped_column(Integer, nullable=True)

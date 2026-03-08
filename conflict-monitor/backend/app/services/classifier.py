@@ -3,6 +3,7 @@ import json
 import logging
 
 import anthropic
+from pydantic import BaseModel, Field, field_validator
 
 from app.config import settings
 
@@ -13,12 +14,39 @@ SYSTEM_PROMPT = """You are an intelligence analyst classifying messages from Tel
 Given a raw message, extract the following fields as JSON:
 - event_type: one of "military", "diplomatic", "economic", "cyber"
 - severity: integer 1-10 (1=routine, 10=major escalation)
-- location_name: the place mentioned (or "Unknown")
-- lat: latitude as float (or null if unknown)
-- lon: longitude as float (or null if unknown)
+- location_name: the specific place or region mentioned (city, base, strait, etc.) or "Unknown" if none
 - summary: a single concise sentence summarizing the event
 
 Respond ONLY with valid JSON, no markdown fences."""
+
+
+class ClassifierResult(BaseModel):
+    event_type: str = "military"
+    severity: int = Field(default=5, ge=1, le=10)
+    location_name: str = "Unknown"
+    summary: str = ""
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type(cls, v):
+        allowed = {"military", "diplomatic", "economic", "cyber"}
+        return v if v in allowed else "military"
+
+    @field_validator("severity")
+    @classmethod
+    def clamp_severity(cls, v):
+        return max(1, min(10, v))
+
+
+# Singleton client — avoids creating connection pools per message
+_client: anthropic.AsyncAnthropic | None = None
+
+
+def _get_client() -> anthropic.AsyncAnthropic:
+    global _client
+    if _client is None:
+        _client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    return _client
 
 
 async def classify_message(raw_text: str) -> dict:
@@ -29,12 +57,10 @@ async def classify_message(raw_text: str) -> dict:
             "event_type": "military",
             "severity": 5,
             "location_name": "Unknown",
-            "lat": None,
-            "lon": None,
             "summary": raw_text[:200],
         }
 
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = _get_client()
 
     for attempt in range(3):
         try:
@@ -45,7 +71,10 @@ async def classify_message(raw_text: str) -> dict:
                 messages=[{"role": "user", "content": raw_text[:2000]}],
             )
             text = response.content[0].text
-            return json.loads(text)
+            raw = json.loads(text)
+            # Validate with Pydantic
+            result = ClassifierResult(**raw)
+            return result.model_dump()
         except anthropic.RateLimitError:
             wait = 2 ** (attempt + 1)
             logger.warning("Rate limited, retrying in %ds", wait)
@@ -59,7 +88,5 @@ async def classify_message(raw_text: str) -> dict:
         "event_type": "military",
         "severity": 5,
         "location_name": "Unknown",
-        "lat": None,
-        "lon": None,
         "summary": raw_text[:200],
     }

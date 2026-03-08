@@ -10,6 +10,8 @@ export interface ConflictEvent {
   lon: number | null;
   timestamp: string;
   created_at: string;
+  report_count?: number;
+  reporting_channels?: string;
 }
 
 export interface EventWSMessage {

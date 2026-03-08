@@ -3,8 +3,9 @@ import type { ConflictEvent, EventWSMessage } from "../types/event";
 
 const MAX_EVENTS = 200;
 const RECONNECT_DELAY = 3000;
-const WS_URL = "ws://localhost:8000/ws/events";
-const REST_URL = "http://localhost:8000/events?limit=50";
+const API_BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:8000";
+const WS_URL = API_BASE.replace(/^http/, "ws") + "/ws/events";
+const REST_URL = `${API_BASE}/events?limit=50`;
 
 export function useEventStream() {
   const [events, setEvents] = useState<ConflictEvent[]>([]);

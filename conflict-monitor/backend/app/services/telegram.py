@@ -8,9 +8,11 @@ from app.config import settings
 from app.db import async_session
 from app.models import Event
 from app.schemas import EventRead, EventWS
-from app.seed_channels import DEFAULT_CHANNELS
+from app.seed_channels import DEFAULT_CHANNELS, get_reliability
 from app.services.broadcaster import broadcaster
 from app.services.classifier import classify_message
+from app.services.dedup import check_duplicate, merge_duplicate
+from app.services.geocoder import geocode
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +63,31 @@ async def start_telegram_listener():
 
             logger.info("New message from %s: %s", channel_name, raw_text[:80])
 
+            # Stage 1: Classify with Claude (no lat/lon — just event_type, severity, location_name, summary)
             result = await classify_message(raw_text)
 
-            lat = result.get("lat")
-            lon = result.get("lon")
+            # Stage 2: Geocode the location name via Nominatim / fallback table
+            location_name = result.get("location_name", "Unknown")
+            coords = await geocode(location_name)
+            lat = coords[0] if coords else None
+            lon = coords[1] if coords else None
+
             geometry = None
             if lat is not None and lon is not None:
                 geometry = from_shape(Point(lon, lat), srid=4326)
 
             async with async_session() as session:
+                # Check for duplicate
+                existing = await check_duplicate(
+                    session, result.get("summary", ""), result.get("event_type", "military"),
+                    lat, lon, event.message.date,
+                )
+                if existing:
+                    await merge_duplicate(session, existing, channel_name, result.get("severity", 5), lat, lon)
+                    ws_payload = EventWS(type="new_event", event=EventRead.model_validate(existing))
+                    await broadcaster.broadcast(ws_payload.model_dump_json())
+                    return
+
                 db_event = Event(
                     source="telegram",
                     channel_name=channel_name,
@@ -81,6 +99,7 @@ async def start_telegram_listener():
                     lon=lon,
                     geometry=geometry,
                     timestamp=event.message.date,
+                    source_reliability=get_reliability(channel_name),
                 )
                 session.add(db_event)
                 await session.commit()
@@ -91,7 +110,7 @@ async def start_telegram_listener():
                     event=EventRead.model_validate(db_event),
                 )
                 await broadcaster.broadcast(ws_payload.model_dump_json())
-                logger.info("Event #%d broadcast (severity=%d)", db_event.id, db_event.severity)
+                logger.info("Event #%d broadcast (severity=%d, loc=%s → %s)", db_event.id, db_event.severity, location_name, coords)
         except Exception as e:
             logger.exception("Error processing message: %s", e)
 
@@ -108,8 +127,11 @@ async def start_telegram_listener():
                 logger.info("Backfill from %s: %s", channel_name, raw_text[:80])
                 result = await classify_message(raw_text)
 
-                lat = result.get("lat")
-                lon = result.get("lon")
+                location_name = result.get("location_name", "Unknown")
+                coords = await geocode(location_name)
+                lat = coords[0] if coords else None
+                lon = coords[1] if coords else None
+
                 geometry = None
                 if lat is not None and lon is not None:
                     geometry = from_shape(Point(lon, lat), srid=4326)
@@ -126,6 +148,7 @@ async def start_telegram_listener():
                         lon=lon,
                         geometry=geometry,
                         timestamp=message.date,
+                        source_reliability=get_reliability(channel_name),
                     )
                     session.add(db_event)
                     await session.commit()

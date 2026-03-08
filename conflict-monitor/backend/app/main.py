@@ -12,10 +12,7 @@ from app.models import Base
 from app.routes.events import router as events_router
 from app.routes.tracking import router as tracking_router
 from app.routes.ws import router as ws_router
-from app.services.maritime import start_maritime_poller
-from app.services.opensky import start_opensky_poller
 from app.services.satellites import start_tle_fetcher
-from app.services.telegram import start_telegram_listener
 
 logger = logging.getLogger("conflict-monitor")
 logging.basicConfig(level=logging.INFO)
@@ -27,28 +24,73 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
         await conn.run_sync(Base.metadata.create_all)
+        # Add columns that may be missing on existing tables
+        for col, default in [
+            ("report_count", "1"),
+            ("reporting_channels", "''"),
+            ("source_reliability", "NULL"),
+        ]:
+            try:
+                await conn.execute(text(
+                    f"ALTER TABLE events ADD COLUMN IF NOT EXISTS {col} "
+                    f"{'INTEGER' if col != 'reporting_channels' else 'TEXT'} DEFAULT {default}"
+                ))
+            except Exception:
+                pass
     logger.info("Database tables ready")
 
     tasks: list[asyncio.Task] = []
 
-    # Start Telegram listener in background
-    if settings.telegram_api_id and settings.telegram_api_hash:
-        tasks.append(asyncio.create_task(start_telegram_listener()))
-        logger.info("Telegram listener started")
+    if settings.demo_mode:
+        # ── DEMO MODE ──────────────────────────────────────────────
+        logger.info("=" * 60)
+        logger.info("  DEMO MODE ACTIVE — generating synthetic data")
+        logger.info("  No Telegram, Anthropic, or AISStream keys required")
+        logger.info("=" * 60)
+
+        from app.services.demo import (
+            seed_demo_history,
+            start_demo_event_generator,
+            start_demo_aircraft_poller,
+            start_demo_vessel_poller,
+        )
+
+        # Seed historical events
+        await seed_demo_history(300)
+
+        # Start synthetic generators
+        tasks.append(asyncio.create_task(start_demo_event_generator()))
+        tasks.append(asyncio.create_task(start_demo_aircraft_poller()))
+        tasks.append(asyncio.create_task(start_demo_vessel_poller()))
+
+        # CelesTrak is free, still use real satellite data
+        tasks.append(asyncio.create_task(start_tle_fetcher()))
+        logger.info("CelesTrak TLE fetcher started (real data)")
+
     else:
-        logger.warning("Telegram credentials not set — listener disabled")
+        # ── PRODUCTION MODE ────────────────────────────────────────
+        from app.services.telegram import start_telegram_listener
+        from app.services.opensky import start_opensky_poller
+        from app.services.maritime import start_maritime_poller
 
-    # Start OpenSky aircraft poller
-    tasks.append(asyncio.create_task(start_opensky_poller()))
-    logger.info("OpenSky poller started")
+        # Telegram listener
+        if settings.telegram_api_id and settings.telegram_api_hash:
+            tasks.append(asyncio.create_task(start_telegram_listener()))
+            logger.info("Telegram listener started")
+        else:
+            logger.warning("Telegram credentials not set — listener disabled")
 
-    # Start CelesTrak TLE fetcher
-    tasks.append(asyncio.create_task(start_tle_fetcher()))
-    logger.info("CelesTrak TLE fetcher started")
+        # Aircraft tracking
+        tasks.append(asyncio.create_task(start_opensky_poller()))
+        logger.info("Aircraft poller started")
 
-    # Start AISStream maritime vessel tracker
-    tasks.append(asyncio.create_task(start_maritime_poller()))
-    logger.info("AISStream maritime poller started")
+        # Satellite TLEs
+        tasks.append(asyncio.create_task(start_tle_fetcher()))
+        logger.info("CelesTrak TLE fetcher started")
+
+        # Maritime vessels
+        tasks.append(asyncio.create_task(start_maritime_poller()))
+        logger.info("Maritime poller started")
 
     yield
 
@@ -74,3 +116,8 @@ app.include_router(ws_router)
 @app.get("/")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/config")
+async def config():
+    return {"demo_mode": settings.demo_mode}

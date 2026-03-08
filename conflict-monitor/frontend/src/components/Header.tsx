@@ -6,6 +6,7 @@ interface HeaderProps {
   aircraftCount: number;
   vesselCount: number;
   satelliteCount: number;
+  demoMode: boolean;
 }
 
 function formatUTCTime(): string {
@@ -29,6 +30,7 @@ export function Header({
   aircraftCount,
   vesselCount,
   satelliteCount,
+  demoMode,
 }: HeaderProps) {
   const [utcTime, setUtcTime] = useState(formatUTCTime);
 
@@ -49,7 +51,7 @@ export function Header({
         borderBottom: "1px solid var(--border)",
       }}
     >
-      {/* Left: Title + Subtitle */}
+      {/* Left: Title + Subtitle + Demo Badge */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
         <h1
           style={{
@@ -72,6 +74,22 @@ export function Header({
         >
           REAL-TIME OSINT INTELLIGENCE
         </span>
+        {demoMode && (
+          <span
+            style={{
+              fontSize: 8,
+              padding: "2px 6px",
+              borderRadius: 2,
+              background: "rgba(210, 153, 34, 0.2)",
+              color: "var(--accent-yellow)",
+              fontWeight: 700,
+              letterSpacing: 1,
+              fontFamily: "var(--font-mono)",
+            }}
+          >
+            DEMO
+          </span>
+        )}
       </div>
 
       {/* Center: UTC Clock */}

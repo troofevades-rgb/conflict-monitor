@@ -106,10 +106,10 @@ export function LiveFeed({ events }: LiveFeedProps) {
     <div
       className="panel"
       style={{
-        gridArea: "feed",
         display: "flex",
         flexDirection: "column",
         position: "relative",
+        height: "100%",
       }}
     >
       {/* Scan-line overlay */}
@@ -309,6 +309,22 @@ export function LiveFeed({ events }: LiveFeedProps) {
                 }}
               >
                 {evt.summary}
+                {(evt.report_count ?? 1) > 1 && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      fontSize: 9,
+                      padding: "1px 5px",
+                      borderRadius: 2,
+                      background: "rgba(88,166,255,0.12)",
+                      color: "var(--accent-blue)",
+                      fontFamily: "var(--font-mono)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {evt.report_count} sources
+                  </span>
+                )}
               </div>
             </div>
           );

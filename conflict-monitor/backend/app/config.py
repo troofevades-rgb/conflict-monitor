@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     opensky_username: str = ""
     opensky_password: str = ""
     aisstream_api_key: str = ""
+    demo_mode: bool = False
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

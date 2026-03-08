@@ -60,12 +60,12 @@ export function EscalationGauge({ events }: EscalationGaugeProps) {
     <div
       className="panel"
       style={{
-        gridArea: "gauge",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         padding: 16,
+        height: "100%",
         boxShadow: `0 0 ${glowSpread}px rgba(${level > 6 ? "248,81,73" : level > 3 ? "210,153,34" : "63,185,80"},${glowAlpha}), 0 0 1px var(--border-glow)`,
         transition: "box-shadow 1s ease",
       }}

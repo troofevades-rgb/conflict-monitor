@@ -211,7 +211,7 @@ function EventMarker({ evt }: { evt: ConflictEvent }) {
     [evt.lat, evt.lon],
   );
   const color = EVENT_COLORS[evt.event_type] || "#888";
-  const size = 0.005 + evt.severity * 0.002;
+  const size = 0.003 + evt.severity * 0.0008;
 
   useFrame(({ clock }) => {
     if (meshRef.current && evt.severity >= 7) {
@@ -592,11 +592,15 @@ function Scene({ events, aircraft, vessels, tleData, jammingZones }: SceneProps)
       <directionalLight position={[5, 3, 5]} intensity={0.2} />
       <Starfield />
       <OrbitControls
+        makeDefault
+        target={[0, 0, 0]}
         autoRotate
         autoRotateSpeed={0.08}
         enablePan={false}
+        enableDamping
+        dampingFactor={0.12}
         minDistance={1.15}
-        maxDistance={5}
+        maxDistance={8}
         rotateSpeed={0.5}
         zoomSpeed={0.8}
       />
@@ -635,23 +639,25 @@ interface GlobeViewProps {
 
 export function GlobeView({ events, aircraft, vessels, tleData, jammingZones }: GlobeViewProps) {
   return (
-    <Canvas
-      camera={{
-        position: [1.74, 1.0, 1.62],
-        fov: 45,
-        near: 0.01,
-        far: 300,
-      }}
-      style={{ width: "100%", height: "100%", background: "#030508" }}
-      gl={{ antialias: true, alpha: false }}
-    >
-      <Scene
-        events={events}
-        aircraft={aircraft}
-        vessels={vessels}
-        tleData={tleData}
-        jammingZones={jammingZones}
-      />
-    </Canvas>
+    <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <Canvas
+        camera={{
+          position: [1.2, 1.6, 2.8],
+          fov: 45,
+          near: 0.01,
+          far: 300,
+        }}
+        style={{ width: "100%", height: "100%", background: "#030508" }}
+        gl={{ antialias: true, alpha: false }}
+      >
+        <Scene
+          events={events}
+          aircraft={aircraft}
+          vessels={vessels}
+          tleData={tleData}
+          jammingZones={jammingZones}
+        />
+      </Canvas>
+    </div>
   );
 }

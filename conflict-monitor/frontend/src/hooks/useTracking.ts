@@ -42,7 +42,7 @@ export interface Vessel {
   length?: number;
 }
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = (import.meta as any).env?.VITE_API_URL || "http://localhost:8000";
 const AIRCRAFT_POLL_MS = 15_000;
 const JAMMING_POLL_MS = 15_000;
 const VESSEL_POLL_MS = 10_000;

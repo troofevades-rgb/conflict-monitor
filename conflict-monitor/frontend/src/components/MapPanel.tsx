@@ -3,6 +3,7 @@ import Map, { Marker, Popup } from "react-map-gl";
 import type { ConflictEvent } from "../types/event";
 import type { Aircraft, JammingZone, TLERecord, Vessel } from "../hooks/useTracking";
 import { GlobeView } from "./GlobeView";
+import { CesiumView } from "./CesiumView";
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN ?? "";
 
@@ -98,7 +99,7 @@ export function MapPanel({ events, aircraft, vessels, tleData, jammingZones }: M
   const [selected, setSelected] = useState<ConflictEvent | null>(null);
   const [newEventIds, setNewEventIds] = useState<Set<number>>(new Set());
   const prevIdsRef = useRef<Set<number>>(new Set());
-  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
+  const [viewMode, setViewMode] = useState<"2d" | "globe" | "terrain">("2d");
 
   const geoEvents = useMemo(
     () => events.filter((e) => e.lat != null && e.lon != null),
@@ -146,7 +147,7 @@ export function MapPanel({ events, aircraft, vessels, tleData, jammingZones }: M
           letterSpacing: 1,
         }}
       >
-        {(["2d", "3d"] as const).map((mode) => (
+        {(["2d", "globe", "terrain"] as const).map((mode, idx, arr) => (
           <button
             key={mode}
             onClick={() => setViewMode(mode)}
@@ -166,7 +167,12 @@ export function MapPanel({ events, aircraft, vessels, tleData, jammingZones }: M
               fontSize: "inherit",
               letterSpacing: "inherit",
               fontWeight: 600,
-              borderRadius: mode === "2d" ? "3px 0 0 3px" : "0 3px 3px 0",
+              borderRadius:
+                idx === 0
+                  ? "3px 0 0 3px"
+                  : idx === arr.length - 1
+                    ? "0 3px 3px 0"
+                    : "0",
             }}
           >
             {mode.toUpperCase()}
@@ -454,7 +460,7 @@ export function MapPanel({ events, aircraft, vessels, tleData, jammingZones }: M
             )}
           </div>
         </>
-      ) : (
+      ) : viewMode === "globe" ? (
         <>
           <GlobeView events={events} aircraft={aircraft} vessels={vessels} tleData={tleData} jammingZones={jammingZones} />
 
@@ -541,6 +547,14 @@ export function MapPanel({ events, aircraft, vessels, tleData, jammingZones }: M
             </div>
           </div>
         </>
+      ) : (
+        <CesiumView
+          events={events}
+          aircraft={aircraft}
+          vessels={vessels}
+          tleData={tleData}
+          jammingZones={jammingZones}
+        />
       )}
     </div>
   );
